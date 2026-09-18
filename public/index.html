@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Friends Messenger — Chat with your crew</title>
+  <meta name="description" content="Private real-time messaging with friends. Register, find people by username, add them and start chatting instantly." />
+  <link rel="icon" href="/logo.jpg" type="image/jpeg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <canvas id="particle-canvas"></canvas>
+  <div class="bg-orbs" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       VIEW: AUTH
+  ═══════════════════════════════════════════ -->
+  <div id="view-auth" class="view active" role="main">
+    <div class="auth-wrap">
+      <div class="auth-card glass-card">
+        <div class="auth-brand">
+          <img src="/logo.jpg" alt="Logo" class="auth-logo" />
+          <div>
+            <h1 class="auth-title">Friends Messenger</h1>
+            <p class="auth-tagline">Real conversations, real connections</p>
+          </div>
+        </div>
+
+        <!-- Tab switcher -->
+        <div class="auth-tabs" role="tablist">
+          <button id="tab-login-btn" class="auth-tab active" role="tab" aria-selected="true" aria-controls="pane-login">Sign In</button>
+          <button id="tab-register-btn" class="auth-tab" role="tab" aria-selected="false" aria-controls="pane-register">Create Account</button>
+          <span class="auth-tab-indicator" id="tab-indicator"></span>
+        </div>
+
+        <!-- Login form -->
+        <div id="pane-login" class="auth-pane active" role="tabpanel">
+          <form id="form-login" autocomplete="off" novalidate>
+            <div class="field-wrap">
+              <label class="field-label" for="login-username">Username</label>
+              <div class="field-input-wrap">
+                <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                <input type="text" id="login-username" class="field-input" placeholder="your_username" autocomplete="username" required />
+              </div>
+            </div>
+            <div class="field-wrap">
+              <label class="field-label" for="login-password">Password</label>
+              <div class="field-input-wrap">
+                <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input type="password" id="login-password" class="field-input" placeholder="••••••••" autocomplete="current-password" required />
+                <button type="button" class="toggle-pw" data-target="login-password" aria-label="Toggle password">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+            <p class="form-error hidden" id="login-error" role="alert"></p>
+            <button type="submit" id="btn-login" class="btn-cta" aria-label="Sign in">
+              <span class="btn-label">Sign In</span>
+              <svg class="btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+          </form>
+          <p class="auth-switch">No account? <button type="button" class="link-btn" id="go-register">Create one →</button></p>
+        </div>
+
+        <!-- Register form -->
+        <div id="pane-register" class="auth-pane" role="tabpanel">
+          <form id="form-register" autocomplete="off" novalidate>
+            <div class="field-wrap">
+              <label class="field-label" for="reg-displayname">Display Name</label>
+              <div class="field-input-wrap">
+                <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <input type="text" id="reg-displayname" class="field-input" placeholder="Alex Jordan" maxlength="32" required />
+              </div>
+            </div>
+            <div class="field-wrap">
+              <label class="field-label" for="reg-username">Username <span class="field-hint">letters, numbers, . - _</span></label>
+              <div class="field-input-wrap">
+                <span class="field-prefix">@</span>
+                <input type="text" id="reg-username" class="field-input" placeholder="alexjordan" maxlength="24" required autocomplete="username" />
+              </div>
+            </div>
+            <div class="field-wrap">
+              <label class="field-label" for="reg-password">Password <span class="field-hint">min 6 chars</span></label>
+              <div class="field-input-wrap">
+                <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input type="password" id="reg-password" class="field-input" placeholder="••••••••" minlength="6" required autocomplete="new-password" />
+                <button type="button" class="toggle-pw" data-target="reg-password" aria-label="Toggle password">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+            <p class="form-error hidden" id="reg-error" role="alert"></p>
+            <button type="submit" id="btn-register" class="btn-cta" aria-label="Create account">
+              <span class="btn-label">Create Account</span>
+              <svg class="btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
+          </form>
+          <p class="auth-switch">Already have an account? <button type="button" class="link-btn" id="go-login">Sign in →</button></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       VIEW: APP SHELL
+  ═══════════════════════════════════════════ -->
+  <div id="view-app" class="view" aria-hidden="true">
+
+    <!-- ── Left Rail ── -->
+    <nav class="rail" aria-label="Main navigation">
+      <div class="rail-top">
+        <div class="rail-logo" title="Friends Messenger">
+          <img src="/logo.jpg" alt="Logo" />
+        </div>
+        <div class="rail-nav">
+          <button id="nav-dms"     class="rail-btn active" data-tab="dms"     title="Messages" aria-label="Direct messages">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span class="rail-badge hidden" id="badge-dms">0</span>
+          </button>
+          <button id="nav-friends" class="rail-btn" data-tab="friends" title="Friends" aria-label="Friends">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span class="rail-badge hidden" id="badge-requests">0</span>
+          </button>
+          <button id="nav-search"  class="rail-btn" data-tab="search"  title="Find Friends" aria-label="Find friends">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
+          <button id="nav-rooms"   class="rail-btn" data-tab="rooms"   title="Group Rooms" aria-label="Group rooms">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="rail-bottom">
+        <button id="rail-user-btn" class="rail-user-btn" title="My profile" aria-label="My profile">
+          <span class="avatar-circle lg" id="rail-avatar" aria-hidden="true"></span>
+          <span class="online-dot-sm"></span>
+        </button>
+        <button id="btn-logout" class="rail-btn" title="Sign out" aria-label="Sign out">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </nav>
+
+    <!-- ── Left Panel ── -->
+    <aside class="left-panel glass-panel" id="left-panel" aria-label="Sidebar">
+
+      <!-- DMs tab -->
+      <div id="tab-dms" class="panel-tab active">
+        <div class="panel-head">
+          <h2 class="panel-title">Messages</h2>
+        </div>
+        <div class="panel-body">
+          <div id="dms-list" class="conv-list"></div>
+        </div>
+      </div>
+
+      <!-- Friends tab -->
+      <div id="tab-friends" class="panel-tab">
+        <div class="panel-head">
+          <h2 class="panel-title">Friends</h2>
+          <span class="pill" id="friends-count-pill">0</span>
+        </div>
+        <div class="panel-body">
+          <div id="requests-section" class="section-block hidden">
+            <div class="section-label">Pending Requests <span class="pill cerulean" id="req-count-badge">0</span></div>
+            <div id="requests-list" class="request-list"></div>
+          </div>
+          <div class="section-label" style="margin-top:8px">All Friends</div>
+          <div id="friends-list" class="conv-list"></div>
+          <div class="empty-hint" id="friends-empty" style="display:none">
+            No friends yet — use <strong>Find Friends</strong> to get started!
+          </div>
+        </div>
+      </div>
+
+      <!-- Search tab -->
+      <div id="tab-search" class="panel-tab">
+        <div class="panel-head">
+          <h2 class="panel-title">Find Friends</h2>
+        </div>
+        <div class="panel-body">
+          <div class="search-input-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="user-search-input" class="search-input" placeholder="Search by username..." aria-label="Search users" maxlength="24" />
+          </div>
+          <div id="search-results" class="search-results">
+            <div class="search-hint">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="36" height="36"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <p>Type a username to find friends</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rooms tab -->
+      <div id="tab-rooms" class="panel-tab">
+        <div class="panel-head">
+          <h2 class="panel-title">Group Rooms</h2>
+          <button id="btn-create-room-open" class="icon-btn" title="Create room" aria-label="Create room">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+        <div class="panel-body">
+          <div id="rooms-list" class="conv-list"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── Main Chat Area ── -->
+    <main class="chat-main" id="chat-main">
+      <!-- Empty state -->
+      <div id="chat-empty" class="chat-empty">
+        <div class="empty-icon">
+          <img src="/logo.jpg" alt="" aria-hidden="true" />
+        </div>
+        <h3>Welcome back, <span id="welcome-name"></span>!</h3>
+        <p>Select a conversation or find new friends to get started.</p>
+        <div class="empty-actions">
+          <button class="btn-outline" id="empty-find-btn">Find Friends</button>
+          <button class="btn-outline" id="empty-rooms-btn">Browse Rooms</button>
+        </div>
+      </div>
+
+      <!-- Active chat -->
+      <div id="chat-active" class="chat-active hidden">
+        <header class="chat-header" id="chat-header">
+          <button class="icon-btn mobile-back" id="btn-mobile-back" aria-label="Back" title="Back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          </button>
+          <div class="chat-header-avatar">
+            <span class="avatar-circle md" id="chat-avatar" aria-hidden="true"></span>
+            <span class="status-dot" id="chat-status-dot" aria-hidden="true"></span>
+          </div>
+          <div class="chat-header-info">
+            <span class="chat-header-name" id="chat-header-name"></span>
+            <span class="chat-header-sub" id="chat-header-sub"></span>
+          </div>
+          <div class="chat-header-actions">
+            <button class="icon-btn" id="btn-show-profile" title="View profile" aria-label="View profile">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="messages-wrap" id="messages-wrap" role="log" aria-live="polite" aria-label="Messages">
+          <div class="messages-inner" id="messages-inner"></div>
+        </div>
+
+        <div class="typing-bar" id="typing-bar" aria-live="polite">
+          <div class="typing-dots"><span></span><span></span><span></span></div>
+          <span class="typing-text" id="typing-text"></span>
+        </div>
+
+        <div class="input-area" id="input-area">
+          <form class="msg-form" id="msg-form" autocomplete="off">
+            <button type="button" class="emoji-toggle" id="btn-emoji" title="Emoji" aria-label="Open emoji picker" aria-expanded="false">😊</button>
+            <textarea id="msg-input" class="msg-input" placeholder="Send a message…" rows="1" maxlength="2000" aria-label="Message input"></textarea>
+            <button type="submit" class="send-btn" id="btn-send" aria-label="Send message" title="Send">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </form>
+        </div>
+      </div>
+    </main>
+
+    <!-- ── Right Profile Panel ── -->
+    <aside class="right-panel glass-panel hidden" id="right-panel" aria-label="Profile">
+      <button class="icon-btn close-panel" id="btn-close-profile" aria-label="Close profile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <div class="profile-content">
+        <div class="profile-avatar-wrap">
+          <span class="avatar-circle xl" id="profile-avatar" aria-hidden="true"></span>
+          <span class="status-dot lg" id="profile-status-dot" aria-hidden="true"></span>
+        </div>
+        <h3 class="profile-name" id="profile-name"></h3>
+        <p class="profile-username" id="profile-username"></p>
+        <span class="profile-status-text" id="profile-status-text">Offline</span>
+        <p class="profile-bio" id="profile-bio"></p>
+        <div class="profile-actions" id="profile-actions"></div>
+        <div class="profile-meta">
+          <div class="meta-row">
+            <span class="meta-label">Member since</span>
+            <span class="meta-val" id="profile-joined"></span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Create Room Modal -->
+    <div id="modal-create-room" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-room-title">
+      <div class="modal glass-card">
+        <div class="modal-head">
+          <h3 id="modal-room-title">Create a Room</h3>
+          <button class="icon-btn" id="btn-close-modal" aria-label="Close modal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form id="form-create-room">
+          <div class="field-wrap">
+            <label class="field-label" for="room-name-input">Room Name</label>
+            <div class="field-input-wrap">
+              <span class="field-prefix">#</span>
+              <input type="text" id="room-name-input" class="field-input" placeholder="movie-night" maxlength="32" required />
+            </div>
+          </div>
+          <div class="field-wrap">
+            <label class="field-label" for="room-desc-input">Description <span class="field-hint">(optional)</span></label>
+            <div class="field-input-wrap">
+              <input type="text" id="room-desc-input" class="field-input" placeholder="What's this room about?" maxlength="80" />
+            </div>
+          </div>
+          <button type="submit" class="btn-cta">
+            <span class="btn-label">Create Room</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div><!-- #view-app -->
+
+  <!-- Emoji Picker -->
+  <div id="emoji-picker" class="emoji-picker glass-panel hidden" role="dialog" aria-label="Emoji picker"></div>
+
+  <!-- Toast container -->
+  <div id="toasts" class="toast-container" aria-live="polite" role="status"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
