@@ -1,22 +1,22 @@
 require('dotenv').config();
-const express    = require('express');
-const http       = require('http');
+const express = require('express');
+const http = require('http');
 const { Server } = require('socket.io');
-const mongoose   = require('mongoose');
-const cors       = require('cors');
-const path       = require('path');
-const bcrypt     = require('bcryptjs');
-const jwt        = require('jsonwebtoken');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const path = require('path');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const { requireAuth, socketAuth, JWT_SECRET } = require('./middleware/auth');
-const User    = require('./models/User');
+const User = require('./models/User');
 const Message = require('./models/Message');
-const Room    = require('./models/Room');
+const Room = require('./models/Room');
 
 // ── App Setup ─────────────────────────────────────────────────────────────────
-const app    = express();
+const app = express();
 const server = http.createServer(app);
-const io     = new Server(server, { cors: { origin: '*', methods: ['GET','POST'] } });
+const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
 
 app.use(cors());
 app.use(express.json());
@@ -24,22 +24,27 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ── MongoDB ───────────────────────────────────────────────────────────────────
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/messengerapp';
-const PORT        = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
-mongoose.set('bufferCommands', false);
-mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 8000 })
-  .then(() => {
+async function connectDB() {
+  try {
+    await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 8000
+    });
+
     console.log('✅ MongoDB connected');
-    seedRooms();
-  })
-  .catch(err => console.warn('⚠️  MongoDB error:', err.message));
-
+    await seedRooms();
+  } catch (err) {
+    console.error('❌ MongoDB connection failed:', err.message);
+    process.exit(1);
+  }
+}
 async function seedRooms() {
   if (await Room.countDocuments() === 0) {
     await Room.insertMany([
-      { name: 'general',  displayName: 'General',  description: 'The main hangout 🏠', createdBy: 'system' },
-      { name: 'random',   displayName: 'Random',   description: 'Anything goes 🎲',   createdBy: 'system' },
-      { name: 'gaming',   displayName: 'Gaming',   description: 'Talk games 🎮',       createdBy: 'system' },
+      { name: 'general', displayName: 'General', description: 'The main hangout 🏠', createdBy: 'system' },
+      { name: 'random', displayName: 'Random', description: 'Anything goes 🎲', createdBy: 'system' },
+      { name: 'gaming', displayName: 'Gaming', description: 'Talk games 🎮', createdBy: 'system' },
     ]);
     console.log('🌱 Seeded default rooms');
   }
@@ -126,7 +131,7 @@ app.get('/api/users/search', requireAuth, async (req, res) => {
     // Attach friendship status
     const me = await User.findById(req.user.userId).select('friends friendRequests');
     const friendIds = me.friends.map(String);
-    const sentReqs  = me.friendRequests.filter(r => r.status === 'pending').map(r => String(r.from));
+    const sentReqs = me.friendRequests.filter(r => r.status === 'pending').map(r => String(r.from));
     // Check if target sent us a request
     const results = users.map(u => ({
       ...u.toPublic(),
@@ -347,7 +352,7 @@ io.on('connection', async (socket) => {
       });
       const msgObj = msg.toObject();
       // Deliver to both users' personal rooms
-      emitToUser(userId,      'receive_dm', msgObj);
+      emitToUser(userId, 'receive_dm', msgObj);
       emitToUser(recipientId, 'receive_dm', msgObj);
     } catch (err) {
       console.error('DM save error:', err.message);
@@ -430,4 +435,8 @@ io.on('connection', async (socket) => {
 const roomUsers = {}; // room -> Map<socketId, displayName>
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-server.listen(PORT, () => console.log(`🚀 Friends Messenger v2 → http://localhost:${PORT}`));
+connectDB().then(() => {
+  server.listen(PORT, () => {
+    console.log(`🚀 Friends Messenger v2 → http://localhost:${PORT}`);
+  });
+});
