@@ -1102,45 +1102,101 @@
   }
 
   // ══════════════════════════════════════════════════════════════════════
+  // 3D TILT PHYSICS & MOUSE PARALLAX
+  // ══════════════════════════════════════════════════════════════════════
+  function apply3DTilt(el, maxTilt = 10) {
+    if (!el || el.dataset.tiltInit) return;
+    el.dataset.tiltInit = 'true';
+    el.style.transformStyle = 'preserve-3d';
+
+    el.addEventListener('mousemove', e => {
+      const rect = el.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const rotX = (((y / rect.height) - 0.5) * -maxTilt).toFixed(2);
+      const rotY = (((x / rect.width) - 0.5) * maxTilt).toFixed(2);
+      el.style.transform = `perspective(1000px) rotateX(${rotX}deg) rotateY(${rotY}deg) scale3d(1.02, 1.02, 1.02)`;
+    });
+
+    el.addEventListener('mouseleave', () => {
+      el.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+    });
+  }
+
+  function init3DElements() {
+    const selector = '.auth-card, .modal, .conv-item, .search-result-item, .request-item, .room-item';
+    document.querySelectorAll(selector).forEach(el => apply3DTilt(el));
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
   // PARTICLES
   // ══════════════════════════════════════════════════════════════════════
   function initParticles() {
     const canvas = $('particle-canvas');
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    let W, H, particles=[];
+    let W, H, particles = [];
 
     function resize() {
-      W=canvas.width=window.innerWidth;
-      H=canvas.height=window.innerHeight;
+      W = canvas.width = window.innerWidth;
+      H = canvas.height = window.innerHeight;
     }
     resize();
     window.addEventListener('resize', resize);
 
     function spawn(n) {
-      particles=[];
-      for (let i=0;i<n;i++) {
+      particles = [];
+      const colors = ['#00F0FF', '#A855F7', '#EC4899', '#38BDF8'];
+      for (let i = 0; i < n; i++) {
         particles.push({
-          x:Math.random()*W, y:Math.random()*H,
-          vx:(Math.random()-.5)*.25, vy:(Math.random()-.5)*.25,
-          r:Math.random()*1.8+.4,
-          a:Math.random()*.4+.08,
-          c:Math.random()>.5?'#007BA7':'#F5E6C8',
+          x: Math.random() * W,
+          y: Math.random() * H,
+          vx: (Math.random() - 0.5) * 0.4,
+          vy: (Math.random() - 0.5) * 0.4,
+          r: Math.random() * 2 + 0.8,
+          c: colors[Math.floor(Math.random() * colors.length)],
+          alpha: Math.random() * 0.5 + 0.2
         });
       }
     }
-    spawn(60);
+    spawn(70);
 
     function frame() {
-      ctx.clearRect(0,0,W,H);
-      particles.forEach(p=>{
-        p.x+=p.vx; p.y+=p.vy;
-        if(p.x<0)p.x=W; if(p.x>W)p.x=0;
-        if(p.y<0)p.y=H; if(p.y>H)p.y=0;
-        ctx.globalAlpha=p.a;
-        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-        ctx.fillStyle=p.c; ctx.fill();
-      });
-      ctx.globalAlpha=1;
+      ctx.clearRect(0, 0, W, H);
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+        if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = p.c;
+        ctx.globalAlpha = p.alpha;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = p.c;
+        ctx.fill();
+
+        for (let j = i + 1; j < particles.length; j++) {
+          const p2 = particles[j];
+          const dx = p.x - p2.x;
+          const dy = p.y - p2.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 110) {
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = '#00F0FF';
+            ctx.globalAlpha = (1 - dist / 110) * 0.2;
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+          }
+        }
+      }
+
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
       requestAnimationFrame(frame);
     }
     frame();
@@ -1153,5 +1209,6 @@
     initParticles();
     initSearch();
     Auth.init();
+    setInterval(init3DElements, 1000);
   });
 })();
