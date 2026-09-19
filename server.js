@@ -114,6 +114,45 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   }
 });
 
+// Update profile (display name, username, bio, avatarColor)
+app.put('/api/auth/profile', requireAuth, async (req, res) => {
+  const { displayName, username, bio, avatarColor } = req.body;
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (displayName) {
+      const dn = displayName.trim();
+      if (!dn || dn.length > 32) return res.status(400).json({ error: 'Display name must be 1-32 characters' });
+      user.displayName = dn;
+    }
+
+    if (username && username.toLowerCase().trim() !== user.username) {
+      const un = username.toLowerCase().trim();
+      if (!/^[a-zA-Z0-9._-]+$/.test(un) || un.length < 2 || un.length > 24) {
+        return res.status(400).json({ error: 'Username must be 2-24 alphanumeric characters, dots, or dashes' });
+      }
+      const existing = await User.findOne({ username: un, _id: { $ne: req.user.userId } });
+      if (existing) return res.status(409).json({ error: 'Username is already taken' });
+      user.username = un;
+    }
+
+    if (bio !== undefined) {
+      user.bio = String(bio).trim().slice(0, 160);
+    }
+
+    if (avatarColor) {
+      user.avatarColor = avatarColor;
+    }
+
+    await user.save();
+    const token = signToken(user);
+    res.json({ message: 'Profile updated successfully', token, user: user.toPublic() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ═════════════════════════════════════════════════════════════════════════════
 // REST API — Users
 // ═════════════════════════════════════════════════════════════════════════════
@@ -126,18 +165,26 @@ app.get('/api/users/search', requireAuth, async (req, res) => {
     const users = await User.find({
       username: { $regex: `^${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, $options: 'i' },
       _id: { $ne: req.user.userId },
-    }).limit(10).select('-passwordHash -friendRequests');
+    }).limit(10).select('-passwordHash');
 
-    // Attach friendship status
     const me = await User.findById(req.user.userId).select('friends friendRequests');
     const friendIds = me.friends.map(String);
-    const sentReqs = me.friendRequests.filter(r => r.status === 'pending').map(r => String(r.from));
-    // Check if target sent us a request
-    const results = users.map(u => ({
-      ...u.toPublic(),
-      isFriend: friendIds.includes(String(u._id)),
-      requestSent: sentReqs.includes(String(u._id)),
-    }));
+    const incomingReqSenderIds = me.friendRequests
+      .filter(r => r.status === 'pending')
+      .map(r => String(r.from._id || r.from));
+
+    const results = users.map(u => {
+      const uDoc = u.toPublic();
+      const isFriend = friendIds.includes(String(u._id));
+      const requestSent = u.friendRequests.some(r => String(r.from._id || r.from) === req.user.userId && r.status === 'pending');
+      const requestReceived = incomingReqSenderIds.includes(String(u._id));
+      return {
+        ...uDoc,
+        isFriend,
+        requestSent,
+        requestReceived,
+      };
+    });
     res.json(results);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -160,7 +207,7 @@ app.get('/api/friends', requireAuth, async (req, res) => {
       online: onlineUsers.has(String(f._id)),
     }));
     const requests = me.friendRequests
-      .filter(r => r.status === 'pending')
+      .filter(r => r.status === 'pending' && r.from)
       .map(r => ({ _id: r._id, from: r.from.toPublic(), createdAt: r.createdAt }));
 
     res.json({ friends, requests });
@@ -183,15 +230,32 @@ app.post('/api/friends/request', requireAuth, async (req, res) => {
     if (!target) return res.status(404).json({ error: 'User not found' });
     if (me.friends.map(String).includes(targetId)) return res.status(409).json({ error: 'Already friends' });
 
-    const alreadySent = target.friendRequests.some(r => String(r.from) === req.user.userId && r.status === 'pending');
+    // Check if target already sent a request to me (auto accept if so)
+    const incomingPending = me.friendRequests.find(r => (String(r.from._id || r.from) === String(targetId)) && r.status === 'pending');
+    if (incomingPending) {
+      incomingPending.status = 'accepted';
+      if (!me.friends.map(String).includes(targetId)) me.friends.push(targetId);
+      if (!target.friends.map(String).includes(req.user.userId)) target.friends.push(req.user.userId);
+      await Promise.all([me.save(), target.save()]);
+      emitToUser(targetId, 'friend_accepted', { by: me.toPublic() });
+      return res.json({ message: 'Friend request accepted! You are now friends.', isFriend: true });
+    }
+
+    const alreadySent = target.friendRequests.some(r => String(r.from._id || r.from) === req.user.userId && r.status === 'pending');
     if (alreadySent) return res.status(409).json({ error: 'Friend request already sent' });
 
     target.friendRequests.push({ from: req.user.userId, status: 'pending' });
     await target.save();
 
-    // Notify target via socket
+    const createdReq = target.friendRequests[target.friendRequests.length - 1];
+
+    // Notify target via socket with actual request ID
     const senderProfile = me.toPublic();
-    emitToUser(targetId, 'friend_request_received', { from: senderProfile });
+    emitToUser(targetId, 'friend_request_received', {
+      _id: createdReq._id,
+      from: senderProfile,
+      createdAt: createdReq.createdAt,
+    });
 
     res.json({ message: 'Friend request sent' });
   } catch (err) {
@@ -206,14 +270,23 @@ app.post('/api/friends/respond', requireAuth, async (req, res) => {
 
   try {
     const me = await User.findById(req.user.userId);
-    const reqDoc = me.friendRequests.id(requestId);
+    const reqStr = String(requestId);
+
+    // Find pending request matching subdoc _id OR sender's user ID
+    let reqDoc = me.friendRequests.find(r => {
+      if (r.status !== 'pending') return false;
+      const subIdMatch = String(r._id) === reqStr;
+      const senderIdMatch = r.from ? (String(r.from._id || r.from) === reqStr) : false;
+      return subIdMatch || senderIdMatch;
+    });
+
     if (!reqDoc) return res.status(404).json({ error: 'Request not found' });
 
-    const fromId = String(reqDoc.from);
+    const fromId = String(reqDoc.from._id || reqDoc.from);
     reqDoc.status = action === 'accept' ? 'accepted' : 'declined';
 
     if (action === 'accept') {
-      if (!me.friends.map(String).includes(fromId)) me.friends.push(reqDoc.from);
+      if (!me.friends.map(String).includes(fromId)) me.friends.push(fromId);
       const them = await User.findById(fromId);
       if (them && !them.friends.map(String).includes(req.user.userId)) {
         them.friends.push(req.user.userId);
@@ -225,7 +298,7 @@ app.post('/api/friends/respond', requireAuth, async (req, res) => {
     await me.save();
 
     const populated = await User.findById(fromId).select('-passwordHash -friendRequests');
-    res.json({ message: `Request ${action}ed`, friend: action === 'accept' ? { ...populated.toPublic(), online: onlineUsers.has(fromId) } : null });
+    res.json({ message: `Request ${action}ed`, friend: action === 'accept' && populated ? { ...populated.toPublic(), online: onlineUsers.has(fromId) } : null });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });

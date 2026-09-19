@@ -142,6 +142,7 @@
     sendReq:  (id)    => API.req('/api/friends/request',{method:'POST',body:JSON.stringify({targetId:id})}),
     respondReq:(rid,action)=>API.req('/api/friends/respond',{method:'POST',body:JSON.stringify({requestId:rid,action})}),
     removeFriend:(id) => API.req(`/api/friends/${id}`,{method:'DELETE'}),
+    updateProfile:(data)=> API.req('/api/auth/profile',{method:'PUT',body:JSON.stringify(data)}),
     dmHistory:(id)    => API.req(`/api/dm/${id}`),
     rooms:    ()      => API.req('/api/rooms'),
     createRoom:(d)    => API.req('/api/rooms',{method:'POST',body:JSON.stringify(d)}),
@@ -186,11 +187,14 @@
       }
     });
 
-    socket.on('friend_request_received', ({from}) => {
-      S.friendRequests.push({ _id: Date.now().toString(), from, createdAt: new Date() });
+    socket.on('friend_request_received', req => {
+      if (!req || !req.from) return;
+      if (!S.friendRequests.some(r => String(r._id) === String(req._id))) {
+        S.friendRequests.push(req);
+      }
       Friends.renderRequests();
       updateRequestBadge();
-      toast(`${from.displayName} sent you a friend request!`, 'info', 5000);
+      toast(`${req.from.displayName} sent you a friend request!`, 'info', 5000);
     });
 
     socket.on('friend_accepted', ({by}) => {
@@ -421,11 +425,13 @@
       initChatInput();
       initEmojiPicker();
       initRoomModal();
+      initProfileModal();
       $('btn-logout').onclick = () => Auth.logout();
       $('btn-close-profile').onclick = () => $('right-panel').classList.add('hidden');
       $('empty-find-btn').onclick = () => switchTab('search');
       $('empty-rooms-btn').onclick = () => switchTab('rooms');
       $('rail-user-btn').onclick = () => showMyProfile();
+      if ($('rail-edit-btn')) $('rail-edit-btn').onclick = () => openEditProfileModal();
       $('btn-mobile-back').onclick = () => {
         $('chat-active').classList.add('hidden');
         $('chat-empty').style.display='';
@@ -578,15 +584,22 @@
     async respond(reqId, action, from) {
       try {
         const { friend } = await API.respondReq(reqId, action);
-        S.friendRequests = S.friendRequests.filter(r=>r._id!==reqId);
-        if (action==='accept' && friend) {
-          if (!S.friends.find(f=>String(f._id)===String(friend._id))) S.friends.push(friend);
-          toast(`You and ${from.displayName} are now friends! 🎉`, 'success');
+        S.friendRequests = S.friendRequests.filter(r => {
+          const rIdStr = String(r._id);
+          const rFromIdStr = r.from ? String(r.from._id || r.from) : '';
+          const targetStr = String(reqId);
+          return rIdStr !== targetStr && rFromIdStr !== targetStr;
+        });
+        if (action === 'accept' && friend) {
+          if (!S.friends.find(f => String(f._id) === String(friend._id))) S.friends.push(friend);
+          toast(`You and ${from?.displayName || friend.displayName} are now friends! 🎉`, 'success');
         } else {
-          toast(`Request from ${from.displayName} declined`, 'info', 2000);
+          toast(`Request from ${from?.displayName || 'user'} declined`, 'info', 2000);
         }
         this.renderList();
         this.renderRequests();
+        const q = $('user-search-input')?.value.trim();
+        if (q) runSearch(q);
       } catch(e) { toast(e.message, 'error'); }
     },
 
@@ -735,28 +748,45 @@
       setAvatar(av, user.displayName, user.avatarColor);
 
       const meta = h('div',{class:'search-result-meta'},[
-        h('div',{class:'search-result-name'},user.displayName),
+        h('div',{class:'search-result-name',title:user.displayName},user.displayName),
         h('div',{class:'search-result-username'},`@${user.username}`),
       ]);
 
       let addLabel='Add Friend', addClass='add-btn';
       if (user.isFriend) { addLabel='Friends ✓'; addClass='add-btn friend'; }
       else if (user.requestSent) { addLabel='Sent ✓'; addClass='add-btn sent'; }
+      else if (user.requestReceived) { addLabel='Accept Request'; addClass='add-btn received'; }
 
       const addBtn = h('button',{class:addClass},addLabel);
-      if (!user.isFriend && !user.requestSent) {
-        addBtn.onclick = async () => {
-          addBtn.disabled=true; addBtn.textContent='Sending…';
-          try {
-            await API.sendReq(String(user._id));
-            addBtn.textContent='Sent ✓'; addBtn.className='add-btn sent';
-            toast(`Friend request sent to ${user.displayName}!`,'success');
-          } catch(e) { toast(e.message,'error'); addBtn.disabled=false; addBtn.textContent=addLabel; }
-        };
-      } else if (user.isFriend) {
+      if (user.isFriend) {
         addBtn.onclick = () => {
           const f = S.friends.find(f=>String(f._id)===String(user._id));
           if (f) openDM(f); switchTab('dms');
+        };
+      } else if (user.requestReceived) {
+        addBtn.onclick = async () => {
+          addBtn.disabled = true; addBtn.textContent = 'Accepting…';
+          try {
+            const pendingReq = S.friendRequests.find(r => r.from && String(r.from._id || r.from) === String(user._id));
+            const reqId = pendingReq ? pendingReq._id : String(user._id);
+            await Friends.respond(reqId, 'accept', user);
+            addBtn.textContent = 'Friends ✓'; addBtn.className = 'add-btn friend';
+          } catch(e) { toast(e.message, 'error'); addBtn.disabled = false; addBtn.textContent = addLabel; }
+        };
+      } else if (!user.requestSent) {
+        addBtn.onclick = async () => {
+          addBtn.disabled=true; addBtn.textContent='Sending…';
+          try {
+            const res = await API.sendReq(String(user._id));
+            if (res.isFriend) {
+              addBtn.textContent='Friends ✓'; addBtn.className='add-btn friend';
+              toast(`You and ${user.displayName} are now friends! 🎉`, 'success');
+              await Friends.load();
+            } else {
+              addBtn.textContent='Sent ✓'; addBtn.className='add-btn sent';
+              toast(`Friend request sent to ${user.displayName}!`, 'success');
+            }
+          } catch(e) { toast(e.message,'error'); addBtn.disabled=false; addBtn.textContent=addLabel; }
         };
       }
 
@@ -767,7 +797,7 @@
   }
 
   // ══════════════════════════════════════════════════════════════════════
-  // PROFILE PANEL
+  // PROFILE PANEL & EDIT PROFILE MODAL
   // ══════════════════════════════════════════════════════════════════════
   function showFriendProfile(friend) {
     const panel = $('right-panel');
@@ -811,8 +841,104 @@
     $('profile-status-dot').className = 'status-dot lg online';
     $('profile-status-text').textContent = 'Online';
     $('profile-status-text').className = 'profile-status-text online';
-    $('profile-actions').innerHTML='';
+    
+    const actions = $('profile-actions');
+    actions.innerHTML='';
+    const editBtn = h('button', { class: 'btn-edit-profile' }, [
+      h('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', width: '16', height: '16' }, [
+        h('path', { d: 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7' }),
+        h('path', { d: 'M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z' }),
+      ]),
+      'Edit Profile'
+    ]);
+    editBtn.onclick = () => openEditProfileModal();
+    actions.appendChild(editBtn);
+
     $('right-panel').classList.remove('hidden');
+  }
+
+  let selectedAvatarColor = '#007BA7';
+
+  function initProfileModal() {
+    const modal = $('modal-edit-profile');
+    if (!modal) return;
+    $('btn-close-profile-modal').onclick = () => modal.classList.add('hidden');
+    modal.onclick = e => { if (e.target === modal) modal.classList.add('hidden'); };
+
+    $('form-edit-profile').onsubmit = async e => {
+      e.preventDefault();
+      const dn = $('edit-displayname').value.trim();
+      const un = $('edit-username').value.trim().toLowerCase();
+      const bio = $('edit-bio').value.trim();
+      const err = $('edit-profile-error');
+      err.classList.add('hidden');
+
+      if (!dn || !un) {
+        err.textContent = 'Display name and username are required';
+        err.classList.remove('hidden');
+        return;
+      }
+
+      const btn = $('btn-save-profile');
+      btn.disabled = true;
+      qs('.btn-label', btn).textContent = 'Saving…';
+
+      try {
+        const res = await API.updateProfile({
+          displayName: dn,
+          username: un,
+          bio,
+          avatarColor: selectedAvatarColor
+        });
+
+        S.user = res.user;
+        if (res.token) {
+          S.token = res.token;
+          localStorage.setItem('fm_token', res.token);
+          initSocket();
+        }
+
+        setAvatar($('rail-avatar'), res.user.displayName, res.user.avatarColor);
+        $('welcome-name').textContent = res.user.displayName;
+        showMyProfile();
+        Friends.renderList();
+
+        modal.classList.add('hidden');
+        toast('Profile updated successfully! ✨', 'success');
+      } catch (e) {
+        err.textContent = e.message;
+        err.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        qs('.btn-label', btn).textContent = 'Save Changes';
+      }
+    };
+  }
+
+  function openEditProfileModal() {
+    const u = S.user;
+    $('edit-displayname').value = u.displayName || '';
+    $('edit-username').value = u.username || '';
+    $('edit-bio').value = u.bio || '';
+    selectedAvatarColor = u.avatarColor || '#007BA7';
+
+    const grid = $('edit-color-picker');
+    grid.innerHTML = '';
+    AVATAR_COLORS.forEach(c => {
+      const swatch = h('div', {
+        class: `color-swatch${c === selectedAvatarColor ? ' active' : ''}`,
+        style: `background:${c}`
+      });
+      swatch.onclick = () => {
+        grid.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+        swatch.classList.add('active');
+        selectedAvatarColor = c;
+      };
+      grid.appendChild(swatch);
+    });
+
+    $('edit-profile-error').classList.add('hidden');
+    $('modal-edit-profile').classList.remove('hidden');
   }
 
   // ══════════════════════════════════════════════════════════════════════

@@ -137,6 +137,9 @@
         </div>
       </div>
       <div class="rail-bottom">
+        <button id="rail-edit-btn" class="rail-btn" title="Edit profile" aria-label="Edit profile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
         <button id="rail-user-btn" class="rail-user-btn" title="My profile" aria-label="My profile">
           <span class="avatar-circle lg" id="rail-avatar" aria-hidden="true"></span>
           <span class="online-dot-sm"></span>
@@ -318,6 +321,48 @@
           </div>
           <button type="submit" class="btn-cta">
             <span class="btn-label">Create Room</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div id="modal-edit-profile" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-profile-title">
+      <div class="modal glass-card">
+        <div class="modal-head">
+          <h3 id="modal-profile-title">Edit Profile</h3>
+          <button class="icon-btn" id="btn-close-profile-modal" aria-label="Close edit profile modal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form id="form-edit-profile">
+          <div class="field-wrap">
+            <label class="field-label" for="edit-displayname">Display Name</label>
+            <div class="field-input-wrap">
+              <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <input type="text" id="edit-displayname" class="field-input" placeholder="Display name" maxlength="32" required />
+            </div>
+          </div>
+          <div class="field-wrap">
+            <label class="field-label" for="edit-username">Username <span class="field-hint">unique handle</span></label>
+            <div class="field-input-wrap">
+              <span class="field-prefix">@</span>
+              <input type="text" id="edit-username" class="field-input" placeholder="username" maxlength="24" required />
+            </div>
+          </div>
+          <div class="field-wrap">
+            <label class="field-label" for="edit-bio">Bio / Status</label>
+            <div class="field-input-wrap" style="padding: 10px 14px;">
+              <textarea id="edit-bio" class="field-input" placeholder="Tell your friends something about yourself..." rows="2" maxlength="160"></textarea>
+            </div>
+          </div>
+          <div class="field-wrap">
+            <label class="field-label">Avatar Accent Color</label>
+            <div id="edit-color-picker" class="color-picker-grid"></div>
+          </div>
+          <p class="form-error hidden" id="edit-profile-error" role="alert"></p>
+          <button type="submit" id="btn-save-profile" class="btn-cta">
+            <span class="btn-label">Save Changes</span>
           </button>
         </form>
       </div>
